@@ -9,6 +9,8 @@
 
 # - ssss.c uses binary extension fields and stores their elements in
 # GMP's mpz_t data type, using the natural encoding.
+# - the Shamir encoding differs from the traditional one, as the i-th
+#   share includes a redudant i^threshold term (see notes for `split`)
 
 # constants copied from ssss.c
 max_degree = 1024
@@ -29,7 +31,9 @@ irred_coeff = [
 # global parameters to be refactored
 RANDOM_SOURCE = "random" # for equivalence testing, use /dev/random in real runs
 
-# fresh code below
+################################################################################
+# Choosing a binary extension field
+################################################################################
 
 def get_field(deg):
     """Return a binary field GF(2^deg) from a hard-coded list of polynomials.
@@ -57,14 +61,9 @@ def test_fields():
         if F.degree() != deg:
             raise Exception("Did not get a finite field of %d elements." % deg)
 
-def cprng_init(fn):
-    """Opens a file to read the randomness from and returns its handle. In
-normal operation you'll want to set fn to /dev/random; but to a fixed
-file for equivalence testing between shamir.sage and ssss.c.
-
-
-This function corresponds to cprng_init of ssss.c."""
-    return open(fn, "rb")
+################################################################################
+# Encoding/decoding of field elements
+################################################################################
 
 def mpz_import_impl(buf, F):
     """Implements mpz_import(x, degree / 8, 1, 1, 0, 0, buf); see
@@ -96,39 +95,6 @@ def test_mpz_import_impl():
     el_expected = a^14 + a^7 + a + 1
     if el != el_expected:
         raise Exception("Simple manual mpz_import_impl test failed.")
-
-def cprng_read(handle, F):
-    """Reads a field element from a randomness source previously opened by
-cprng_init. The principal call in ssss.c is
-
-   mpz_import(x, degree / 8, 1, 1, 0, 0, buf)
-
-Where arguments mean interpreting the degree / 8 byte buffer as an
-array of 1 byte "words", stored with the most significant word first,
-and not using GMP's nail bits.
-
-(See https://gmplib.org/manual/Integer-Import-and-Export.html for details.)
-
-This function corresponds to cprng_read of ssss.c"""
-    deg = F.degree()
-
-    # read deg/8 bytes
-    buf = []
-    for i in range(deg/8):
-        char = handle.read(1)
-        if char == "":
-            raise Exception("Unexpected end of file.")
-        buf.append(char)
-
-    # convert them into a field element
-    el = mpz_import_impl(buf, F)
-    return el
-
-def cprng_close(handle):
-    """Closes the handle previously opened by cprng_init.
-
-This function corresponds to cprng_deinit of ssss.c"""
-    handle.close()
 
 def field_import(s, F):
     """Import a string s into a field element.
@@ -166,6 +132,56 @@ This corresponds to invoking field_print of ssss.c with hexmode=1."""
     s = ("%%0%dx" % (deg/4)) % i
     return s
     
+################################################################################
+# Generating a uniformly random field element
+################################################################################
+
+def cprng_init(fn):
+    """Opens a file to read the randomness from and returns its handle. In
+normal operation you'll want to set fn to /dev/random; but to a fixed
+file for equivalence testing between shamir.sage and ssss.c.
+
+
+This function corresponds to cprng_init of ssss.c."""
+    return open(fn, "rb")
+
+def cprng_read(handle, F):
+    """Reads a field element from a randomness source previously opened by
+cprng_init. The principal call in ssss.c is
+
+   mpz_import(x, degree / 8, 1, 1, 0, 0, buf)
+
+Where arguments mean interpreting the degree / 8 byte buffer as an
+array of 1 byte "words", stored with the most significant word first,
+and not using GMP's nail bits.
+
+(See https://gmplib.org/manual/Integer-Import-and-Export.html for details.)
+
+This function corresponds to cprng_read of ssss.c"""
+    deg = F.degree()
+
+    # read deg/8 bytes
+    buf = []
+    for i in range(deg/8):
+        char = handle.read(1)
+        if char == "":
+            raise Exception("Unexpected end of file.")
+        buf.append(char)
+
+    # convert them into a field element
+    el = mpz_import_impl(buf, F)
+    return el
+
+def cprng_close(handle):
+    """Closes the handle previously opened by cprng_init.
+
+This function corresponds to cprng_deinit of ssss.c"""
+    handle.close()
+
+################################################################################
+# Share generation
+################################################################################
+
 def split(secret, threshold, number):
     """Perform the Shamir secret sharing with specified threshold and
 number of shares.
@@ -219,6 +235,8 @@ mode / security level autodetect to their default values."""
         # output the share
         print format_str % (i, field_print_hex(share))
 
+################################################################################
+
 if __name__ == '__main__':
     test_fields()
     test_mpz_import_impl()
@@ -237,4 +255,3 @@ if __name__ == '__main__':
     #    ./ssss-split -t 5 -n 10 -D
     # and
     # split('same_secret', 5, 10)
-    split('same_secret', 5, 10)
