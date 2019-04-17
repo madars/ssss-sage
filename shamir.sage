@@ -106,7 +106,7 @@ and not using GMP's nail bits.
 
 (See https://gmplib.org/manual/Integer-Import-and-Export.html for details.)
 
-This function corresponds to cprng_deinit of ssss.c"""
+This function corresponds to cprng_read of ssss.c"""
     deg = F.degree()
 
     # read deg/8 bytes
@@ -121,6 +121,11 @@ This function corresponds to cprng_deinit of ssss.c"""
     el = mpz_import_impl(buf, F)
     return el
 
+def cprng_close(handle):
+    """Closes the handle previously opened by cprng_init.
+
+This function corresponds to cprng_deinit of ssss.c"""
+    handle.close()
         
 if __name__ == '__main__':
     test_fields()
