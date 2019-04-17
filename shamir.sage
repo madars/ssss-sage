@@ -126,7 +126,34 @@ def cprng_close(handle):
 
 This function corresponds to cprng_deinit of ssss.c"""
     handle.close()
-        
+
+def field_import(s, F):
+    """Import a string s into a field element.
+
+This function corresponds to field_import of ssss.c, except that it does not implement hex mode."""
+    deg = F.degree()
+    if len(s) > deg / 8:
+        raise ValueError("Input string too long.")
+
+    # compute the buffer including the leading padding bytes for our
+    # reimplementation of mpz_import
+
+    buf = [chr(0) for i in range(deg/8 - len(s))] + [c for c in s]
+    el = mpz_import_impl(buf, F)
+
+    return el
+
+def test_field_import():
+    F = get_field(16)
+    # bin(ord('M')) = '0b1001101'
+    el = field_import('M', F)
+
+    a = F.gen()
+    el_expected = a^6 + a^3 + a^2 + 1
+    if el != el_expected:
+        raise Exception("Simple manual field_import test failed.")
+    
 if __name__ == '__main__':
     test_fields()
     test_mpz_import_impl()
+    test_field_import()
