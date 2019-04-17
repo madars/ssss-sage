@@ -26,6 +26,9 @@ irred_coeff = [
   3,1,15,7,5,19,18,10,7,5,3,12,7,2,7,5,1,14,9,6,10,3,2,15,13,12,12,11,9,16,
   9,7,12,9,3,9,5,2,17,10,6,24,9,3,17,15,13,5,4,3,19,17,8,15,6,3,19,6,1 ]
 
+# global parameters to be refactored
+RANDOM_SOURCE = "random" # for equivalence testing, use /dev/random in real runs
+
 # fresh code below
 
 def get_field(deg):
@@ -152,8 +155,86 @@ def test_field_import():
     el_expected = a^6 + a^3 + a^2 + 1
     if el != el_expected:
         raise Exception("Simple manual field_import test failed.")
+
+def field_print_hex(el):
+    """Return a hexadecimal representation of a field element.
+
+This corresponds to invoking field_print of ssss.c with hexmode=1."""
+    deg = el.parent().degree()
+
+    i = el.integer_representation()
+    s = ("%%0%dx" % (deg/4)) % i
+    return s
     
+def split(secret, threshold, number):
+    """Perform the Shamir secret sharing with specified threshold and
+number of shares.
+
+This function corresponds to split of ssss-split -t threshold -n
+number -D, that is, disabling the diffusion layer, and leaving hex
+mode / security level autodetect to their default values."""
+    digits_to_print = 1
+    while 10^digits_to_print <= number:
+        digits_to_print += 1
+    format_str = "%%0%dd-%%s" % digits_to_print
+    
+    deg = len(secret) * 8
+
+    F = get_field(deg)
+    a = F.gen()
+
+    P.<y> = PolynomialRing(F) # polynomials over F in indeterminate y
+
+    # construct the Shamir secret sharing polynomial; that is encode
+    # the secret in the constant term and choose all other terms at
+    # random.
+    handle = cprng_init(RANDOM_SOURCE)
+    poly = field_import(secret, F)
+    for i in range(1, threshold):
+        random_coeff = cprng_read(handle, F)
+        poly += random_coeff * y^i
+    cprng_close(handle)
+
+    # evaluate poly at a point corresponding to each share
+    for i in range(1, number+1):
+        # first construct the evaluation point, taken to be the i-th
+        # field element in lexicographical order
+        el = F.fetch_int(i)
+
+        # then evaluate the secret polynomial at this point
+        share = poly(el)
+
+        # ssss.c implementation of Horner's algorithm has a bug and it
+        # adds an extra (i+1)^threshold term to the calculated share
+        # (that is, in `horner` function mpz_set(y, x) should be
+        # mpz_set_ui(y, 0)). This change in computation is not a
+        # security vulnerability as the attacker can add or subtract
+        # this term himself.
+
+        # We aim to be compatible with ssss so add this redudant term
+        # here:
+
+        share += el^threshold
+
+        # output the share
+        print format_str % (i, field_print_hex(share))
+
 if __name__ == '__main__':
     test_fields()
     test_mpz_import_impl()
     test_field_import()
+
+    # test split() by compiling a version of ssss-split with a fixed
+    # randomness source. i.e. first patch RANDOM_SOURCE in
+    # vendor/ssss.c and then run:
+    
+    # gcc -O2 -o ssss-split vendor/ssss.c -lgmp
+
+    # afterwards create your fixed randomness file (e.g. dd
+    # if=/dev/urandom of=random bs=1M count=1)
+
+    # and compare the results of:
+    #    ./ssss-split -t 5 -n 10 -D
+    # and
+    # split('same_secret', 5, 10)
+    split('same_secret', 5, 10)
