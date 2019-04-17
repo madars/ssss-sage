@@ -5,6 +5,11 @@
 # Author: Madars Virza <madars@mit.edu>
 #
 
+# Notes:
+
+# - ssss.c uses binary extension fields and stores their elements in
+# GMP's mpz_t data type, using the natural encoding.
+
 # constants copied from ssss.c
 max_degree = 1024
 irred_coeff = [
@@ -29,7 +34,7 @@ def get_field(deg):
 This roughly corresponds to field_init function of ssss.c
 """
     if not (deg >= 8 and deg <= max_degree and deg % 8 == 0):
-        raise "Invalid extension degree (see field_size_valid in ssss.c)"
+        raise ValueError("Invalid extension degree (see field_size_valid in ssss.c)")
     GF2.<x> = GF(2)[]
 
     c1 = irred_coeff[3 * (deg / 8 - 1) + 0]
@@ -47,7 +52,76 @@ def test_fields():
     for deg in xrange(8, max_degree+8, 8):
         F = get_field(deg)
         if F.degree() != deg:
-            raise "Did not get a finite field of %d elements." % deg
+            raise Exception("Did not get a finite field of %d elements." % deg)
 
+def cprng_init(fn):
+    """Opens a file to read the randomness from and returns its handle. In
+normal operation you'll want to set fn to /dev/random; but to a fixed
+file for equivalence testing between shamir.sage and ssss.c.
+
+
+This function corresponds to cprng_init of ssss.c."""
+    return open(fn, "rb")
+
+def mpz_import_impl(buf, F):
+    """Implements mpz_import(x, degree / 8, 1, 1, 0, 0, buf); see
+cprng_read() for details."""
+
+    deg = F.degree()
+    if len(buf) != deg/8:
+        raise ValueError("This function requires buffer of the same size as a field element representation.")
+
+    a = F.gen()
+    el = F(0)
+    for i in range(deg/8):
+        # shift in the current byte
+        el *= a^8
+        for j in range(8):
+            if ord(buf[i]) & (1<<j):
+                el += a^j
+    return el
+
+def test_mpz_import_impl():
+    F = get_field(16)
+
+    # 0x4083 = 0100 0000 1000 0011
+    #        = a^14 + a^7 + a + 1
+
+    el = mpz_import_impl([chr(0x40), chr(0x83)], F)
+
+    a = F.gen()
+    el_expected = a^14 + a^7 + a + 1
+    if el != el_expected:
+        raise Exception("Simple manual mpz_import_impl test failed.")
+
+def cprng_read(handle, F):
+    """Reads a field element from a randomness source previously opened by
+cprng_init. The principal call in ssss.c is
+
+   mpz_import(x, degree / 8, 1, 1, 0, 0, buf)
+
+Where arguments mean interpreting the degree / 8 byte buffer as an
+array of 1 byte "words", stored with the most significant word first,
+and not using GMP's nail bits.
+
+(See https://gmplib.org/manual/Integer-Import-and-Export.html for details.)
+
+This function corresponds to cprng_deinit of ssss.c"""
+    deg = F.degree()
+
+    # read deg/8 bytes
+    buf = []
+    for i in range(deg/8):
+        char = handle.read(1)
+        if char == "":
+            raise Exception("Unexpected end of file.")
+        buf.append(char)
+
+    # convert them into a field element
+    el = mpz_import_impl(buf, F)
+    return el
+
+        
 if __name__ == '__main__':
     test_fields()
+    test_mpz_import_impl()
