@@ -5,10 +5,13 @@
 # Author: Madars Virza <madars@mit.edu>
 #
 
+import argparse
+import sys
+
 # Notes:
 
 # - ssss.c uses binary extension fields and stores their elements in
-# GMP's mpz_t data type, using the natural encoding.
+#   GMP's mpz_t data type, using the natural encoding.
 # - the Shamir encoding differs from the traditional one, as the i-th
 #   share includes a redudant i^threshold term (see notes for `split`)
 
@@ -29,7 +32,7 @@ irred_coeff = [
   9,7,12,9,3,9,5,2,17,10,6,24,9,3,17,15,13,5,4,3,19,17,8,15,6,3,19,6,1 ]
 
 # global parameters to be refactored
-RANDOM_SOURCE = "random" # for equivalence testing, use /dev/random in real runs
+RANDOM_SOURCE = "fixed-random" # for equivalence testing, use /dev/random in real runs
 
 ################################################################################
 # Choosing a binary extension field
@@ -237,11 +240,13 @@ mode / security level autodetect to their default values."""
 
 ################################################################################
 
-if __name__ == '__main__':
+def test_all():
     test_fields()
     test_mpz_import_impl()
-    test_field_import()
+    test_field_import()    
 
+if __name__ == '__main__':
+    
     # test split() by compiling a version of ssss-split with a fixed
     # randomness source. i.e. first patch RANDOM_SOURCE in
     # vendor/ssss.c and then run:
@@ -255,3 +260,18 @@ if __name__ == '__main__':
     #    ./ssss-split -t 5 -n 10 -D
     # and
     # split('same_secret', 5, 10)
+    arg_parser = argparse.ArgumentParser(
+        description="An auditable reimplementation of ssss.c")
+    arg_parser.add_argument(
+        "action", help="Whether to split into or combine shares",
+        choices=('split', 'combine'))
+    arg_parser.add_argument("-t", help="Threshold", type=int)
+    arg_parser.add_argument("-n", help="Number of shares", type=int)
+    args = arg_parser.parse_args()
+
+    if args.action == "split":
+        print >>sys.stderr, "Enter the secret to split: ",
+        secret = raw_input()
+        split(secret, args.t, args.n)
+    else:
+        raise Exception("Combining not implemented yet.")

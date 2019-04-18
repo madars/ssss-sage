@@ -51,7 +51,7 @@
 #include <gmp.h>
 
 #define VERSION "0.5"
-#define RANDOM_SOURCE "/dev/random"
+#define RANDOM_SOURCE "fixed-random"
 #define MAXDEGREE 1024
 #define MAXTOKENLEN 128
 #define MAXLINELEN (MAXTOKENLEN + 1 + 10 + 1 + MAXDEGREE / 4 + 10)
