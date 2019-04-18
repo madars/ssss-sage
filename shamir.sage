@@ -263,8 +263,9 @@ if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser(
         description="An auditable reimplementation of ssss.c")
     arg_parser.add_argument(
-        "action", help="Whether to split into or combine shares",
-        choices=('split', 'combine'))
+        "action", help=("Whether to split into shares, combine shares, " +
+                        "or perform (limited) internal tests."),
+        choices=('split', 'combine', 'test'))
     arg_parser.add_argument("-t", help="Threshold", type=int)
     arg_parser.add_argument("-n", help="Number of shares", type=int)
     args = arg_parser.parse_args()
@@ -273,5 +274,8 @@ if __name__ == '__main__':
         print >>sys.stderr, "Enter the secret to split: ",
         secret = raw_input()
         split(secret, args.t, args.n)
-    else:
+    elif args.action == "combine":
         raise Exception("Combining not implemented yet.")
+    else:
+        test_all() # all tests raise exceptions
+        print "The (limited) set of internal tests passed."
