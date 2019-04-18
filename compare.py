@@ -16,7 +16,7 @@ def pick_test_secret(n):
                                   string.digits, k=n))
 
 def get_ssss_split_shares(secret, threshold, num_shares):
-    """Invoke a ssss-spit -t THRESHOLD -n NUM_SHARES -D, inputting the
+    """Invoke "ssss-spit -t THRESHOLD -n NUM_SHARES -D" inputting the
 specified secret, and return the list of shares output by it."""
     p = Popen(['./ssss-split',
                '-t', str(THRESHOLD),
@@ -29,7 +29,7 @@ specified secret, and return the list of shares output by it."""
     return shares
 
 def get_sage_split_shares(secret, threshold, num_shares):
-    """Invoke a shamir.sage -t THRESHOLD -n NUM_SHARES, inputting the
+    """Invoke "shamir.sage -t THRESHOLD -n NUM_SHARES split", inputting the
 specified secret, and return the list of shares output by it."""
     p = Popen(['./shamir.sage',
                '-t', str(THRESHOLD),

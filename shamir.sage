@@ -224,7 +224,7 @@ mode / security level autodetect to their default values."""
         share = poly(el)
 
         # ssss.c implementation of Horner's algorithm has a bug and it
-        # adds an extra (i+1)^threshold term to the calculated share
+        # adds an extra i^threshold term to the calculated share
         # (that is, in `horner` function mpz_set(y, x) should be
         # mpz_set_ui(y, 0)). This change in computation is not a
         # security vulnerability as the attacker can add or subtract
