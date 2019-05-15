@@ -185,13 +185,16 @@ This function corresponds to cprng_deinit of ssss.c"""
 # Share generation
 ################################################################################
 
-def split(secret, threshold, number):
+def split(secret, threshold, number, use_diffuser):
     """Perform the Shamir secret sharing with specified threshold and
 number of shares.
 
 This function corresponds to split of ssss-split -t threshold -n
 number -D, that is, disabling the diffusion layer, and leaving hex
 mode / security level autodetect to their default values."""
+    if use_diffuser:
+        raise ValueError("Diffuser mode not implemented yet.")
+
     digits_to_print = 1
     while 10^digits_to_print <= number:
         digits_to_print += 1
@@ -268,12 +271,17 @@ if __name__ == '__main__':
         choices=('split', 'combine', 'test'))
     arg_parser.add_argument("-t", help="Threshold", type=int)
     arg_parser.add_argument("-n", help="Number of shares", type=int)
+    arg_parser.add_argument('-d', help="Enable diffusion layer",
+                            dest='use_diffuser', action='store_true')
+    arg_parser.add_argument('-D', help="Disable diffusion layer",
+                            dest='use_diffuser', action='store_false')
+    arg_parser.set_defaults(use_diffuser=False)
     args = arg_parser.parse_args()
 
     if args.action == "split":
         print >>sys.stderr, "Enter the secret to split: ",
         secret = raw_input()
-        split(secret, args.t, args.n)
+        split(secret, args.t, args.n, args.use_diffuser)
     elif args.action == "combine":
         raise Exception("Combining not implemented yet.")
     else:
